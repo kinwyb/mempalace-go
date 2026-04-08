@@ -10,6 +10,7 @@ MemPalace 是一个本地 AI 记忆系统，采用"宫殿"（Palace）作为核�
 - 🔍 **语义搜索**：基于向量相似度的智能检索
 - 📚 **四层记忆栈**：L0（身份）→ L1（核心故事）→ L2（按需）→ L3（深度搜索）
 - 🔗 **MCP 服务器**：支持 19 个工具的 Model Context Protocol 实现
+- 📦 **Go SDK**：提供公共 API，可直接集成到 Go 项目
 - 🗃️ **SQLite 向量存储**：无需外部数据库，内置 FTS5 全文搜索
 - 🎯 **AAAK 压缩方言**：实体识别与压缩编码
 
@@ -124,6 +125,233 @@ MCP 服务器提供以下 19 个工具：
 | `detect_room` | 检测内容所属房间 |
 | `store_layer` | 存储到特定记忆层 |
 
+## Go SDK 集成
+
+MemPalace 提供了公共 Go API，允许其他 Go 项目直接集成而无需通过 MCP 协议。
+
+### 安装
+
+```bash
+go get github.com/kinwyb/mempalace-go/pkg/mempalace
+```
+
+### 快速开始
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/kinwyb/mempalace-go/pkg/mempalace"
+)
+
+func main() {
+    ctx := context.Background()
+
+    // 创建 Palace 实例
+    palace, err := mempalace.New(ctx,
+        mempalace.WithOllama("http://localhost:11434", "nomic-embed-text"),
+        mempalace.WithPalacePath("~/.mempalace/palace"),
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer palace.Close()
+
+    // 搜索内容
+    result, err := palace.Search(ctx, "数据库连接错误",
+        mempalace.WithWing("myproject"),
+        mempalace.WithLimit(10),
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, item := range result.Results {
+        fmt.Printf("[%s/%s] %s\n", item.Wing, item.Room, item.Content[:100])
+    }
+}
+```
+
+### 配置选项
+
+```go
+// Ollama 嵌入模型
+mempalace.WithOllama("http://localhost:11434", "nomic-embed-text")
+
+// OpenAI 嵌入模型
+mempalace.WithOpenAI("sk-...", "", "text-embedding-3-small")
+
+// 自定义存储路径
+mempalace.WithPalacePath("/data/my-palace")
+
+// 从配置文件加载
+mempalace.WithConfigFile("~/.mempalace/config.yaml")
+
+// 文本分块参数
+mempalace.WithChunkSize(1000, 200, 100)
+
+// 搜索默认参数
+mempalace.WithSearchDefaults(20, 0.85)
+
+// 自定义嵌入器
+mempalace.WithEmbedder(myCustomEmbedder)
+```
+
+### 核心操作
+
+#### 添加内容
+
+```go
+// 添加单个内容
+result, err := palace.Add(ctx, "重要决策：使用 PostgreSQL 作为主数据库",
+    mempalace.WithWingForAdd("myproject"),
+    mempalace.WithRoomForAdd("decisions"),
+    mempalace.WithMetadata(map[string]any{
+        "priority": "high",
+        "date":     "2024-01-15",
+    }),
+)
+
+// 添加文档
+doc := mempalace.Document{
+    Content: "API 端点设计文档",
+    Wing:    "myproject",
+    Room:    "api",
+    Source:  "docs/api.md",
+}
+result, err := palace.AddDocument(ctx, doc)
+
+// 批量添加
+docs := []mempalace.Document{...}
+results, err := palace.AddBatch(ctx, docs)
+```
+
+#### 搜索内容
+
+```go
+// 基本搜索
+result, err := palace.Search(ctx, "用户认证",
+    mempalace.WithLimit(10),
+)
+
+// 按翼/房间过滤
+result, err := palace.Search(ctx, "数据库配置",
+    mempalace.WithWing("myproject"),
+    mempalace.WithRoom("config"),
+    mempalace.WithLimit(5),
+)
+
+// 检查重复
+dupResult, err := palace.CheckDuplicate(ctx, "内容...", 0.9)
+if dupResult.IsDuplicate {
+    fmt.Println("内容已存在")
+}
+```
+
+#### 四层记忆栈
+
+```go
+// 存储到 L0（身份层）
+err := palace.StoreInLayer(ctx, mempalace.L0, 
+    "我是一名 Go 开发者，喜欢简洁的架构设计",
+    mempalace.WithWingForLayer("identity"),
+)
+
+// 存储到 L1（核心故事层）
+err := palace.StoreInLayer(ctx, mempalace.L1,
+    "当前正在开发用户认证模块",
+    mempalace.WithWingForLayer("myproject"),
+)
+
+// 获取唤醒上下文（L0 + L1）
+wakeUp, err := palace.WakeUp(ctx)
+fmt.Println(wakeUp)
+
+// 自动分类内容到合适的层级
+layer := palace.AutoClassify("我目前正在处理...")
+fmt.Printf("推荐层级: %s\n", layer)
+```
+
+#### 挖掘项目文件
+
+```go
+// 挖掘项目目录
+result, err := palace.Mine(ctx, "/path/to/project",
+    mempalace.WithWingOverride("myproject"),
+)
+
+// 挖掘对话文件
+result, err := palace.MineConversations(ctx, "/path/to/exports",
+    mempalace.WithWingOverride("conversations"),
+    mempalace.WithExtractMode("exchange"),
+)
+
+// 预览模式（不实际存储）
+result, err := palace.Mine(ctx, "/path/to/project",
+    mempalace.WithDryRun(),
+)
+```
+
+#### 统计和管理
+
+```go
+// 获取统计信息
+stats, err := palace.GetStats(ctx)
+fmt.Printf("文档数: %d, 翼数: %d\n", stats.TotalDocuments, stats.TotalWings)
+
+// 获取所有翼
+wings, err := palace.GetWings(ctx)
+
+// 获取翼下的房间
+rooms, err := palace.GetRooms(ctx, "myproject")
+
+// 删除操作
+err := palace.Delete(ctx, "document-id")
+err := palace.DeleteByWing(ctx, "old-project")
+err := palace.DeleteByRoom(ctx, "myproject", "deprecated")
+```
+
+### 层级常量
+
+```go
+const (
+    L0 mempalace.Layer = 0  // 身份层 - 核心身份、关键偏好
+    L1 mempalace.Layer = 1  // 核心故事层 - 项目上下文、当前目标
+    L2 mempalace.Layer = 2  // 按需层 - 需要时检索
+    L3 mempalace.Layer = 3  // 深度搜索层 - 全面搜索
+)
+```
+
+### 错误处理
+
+```go
+result, err := palace.Search(ctx, "query")
+if err != nil {
+    if mempalace.Is(err, mempalace.ErrClosed) {
+        // Palace 已关闭
+    } else if mempalace.Is(err, mempalace.ErrSearch) {
+        // 搜索错误
+    }
+    log.Fatal(err)
+}
+```
+
+### 使用 Mock Embedder 测试
+
+```go
+import "github.com/kinwyb/mempalace-go/pkg/embedding"
+
+// 创建测试用 Palace
+palace, err := mempalace.New(ctx,
+    mempalace.WithPalacePath(t.TempDir()),
+    mempalace.WithEmbedder(embedding.NewMockEmbedder(768)),
+)
+```
+
 ## 项目结构
 
 ```
@@ -146,6 +374,7 @@ mempalace-go/
 │   └── split/              # 文件拆分
 ├── pkg/
 │   ├── embedding/          # 嵌入模型接口
+│   ├── mempalace/          # 公共 Go SDK
 │   └── vector/             # 向量存储接口
 ├── go.mod
 └── README.md
@@ -248,6 +477,7 @@ go test -cover ./...
 | CLI 框架 | Click | Cobra |
 | 配置格式 | YAML | YAML |
 | MCP 工具数 | 19 | 19 |
+| Go SDK | 无 | ✅ 完整支持 |
 
 ## 依赖
 

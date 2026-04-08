@@ -4,6 +4,7 @@ package vector
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
@@ -597,9 +598,12 @@ func jsonToMetadata(s string) map[string]any {
 	if s == "" || s == "{}" {
 		return make(map[string]any)
 	}
-	// Simple parsing - in production use encoding/json
+
 	result := make(map[string]any)
-	// This is a simplified implementation
+	if err := json.Unmarshal([]byte(s), &result); err != nil {
+		slog.Warn("failed to parse metadata JSON", "error", err, "json", s)
+		return make(map[string]any)
+	}
 	return result
 }
 
