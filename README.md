@@ -250,6 +250,13 @@ dupResult, err := palace.CheckDuplicate(ctx, "内容...", 0.9)
 if dupResult.IsDuplicate {
     fmt.Println("内容已存在")
 }
+
+// 使用预计算的向量搜索
+vector := []float32{0.1, 0.2, 0.3, ...} // 你的嵌入向量
+result, err := palace.SearchByVector(ctx, vector,
+    mempalace.WithWing("myproject"),
+    mempalace.WithLimit(10),
+)
 ```
 
 #### 四层记忆栈

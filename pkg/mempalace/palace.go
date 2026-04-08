@@ -163,6 +163,57 @@ func (p *Palace) Search(ctx context.Context, query string, opts ...SearchOption)
 	}, nil
 }
 
+// SearchByVector performs a search using a precomputed embedding vector.
+// This is useful when you already have an embedding and want to avoid
+// recomputing it for the search.
+func (p *Palace) SearchByVector(ctx context.Context, vec []float32, opts ...SearchOption) (*SearchResult, error) {
+	if p.closed {
+		return nil, NewError(ErrClosed, "palace is closed", nil)
+	}
+
+	start := time.Now()
+
+	// Apply search options
+	sc := &searchConfig{}
+	for _, opt := range opts {
+		opt(sc)
+	}
+
+	limit := sc.limit
+	if limit == 0 {
+		limit = p.config.SearchLimit
+	}
+
+	// Perform search by vector
+	results, err := p.store.SearchByVector(ctx, vec, sc.wing, sc.room, limit)
+	if err != nil {
+		return nil, NewError(ErrSearch, "vector search failed", err)
+	}
+
+	// Convert results
+	items := make([]ResultItem, len(results))
+	for i, r := range results {
+		items[i] = convertSearchResult(r)
+	}
+
+	duration := time.Since(start)
+
+	slog.Debug("Vector search completed",
+		"results", len(results),
+		"wing", sc.wing,
+		"room", sc.room,
+		"duration", duration,
+	)
+
+	return &SearchResult{
+		Query:    "",
+		Results:  items,
+		Total:    len(results),
+		Filters:  SearchFilters{Wing: sc.wing, Room: sc.room},
+		Duration: duration,
+	}, nil
+}
+
 // Get retrieves a document by its ID.
 func (p *Palace) Get(ctx context.Context, id string) (*Document, error) {
 	if p.closed {

@@ -19,6 +19,11 @@
 //	result, err := palace.Search(ctx, "database connection error",
 //	    mempalace.WithLimit(10))
 //
+//	// Search with a precomputed vector
+//	result, err = palace.SearchByVector(ctx, embeddingVector,
+//	    mempalace.WithWing("myproject"),
+//	    mempalace.WithLimit(10))
+//
 // # Configuration Options
 //
 // Use options to customize the Palace:

@@ -72,6 +72,47 @@ func ExamplePalace_Search() {
 	// Output: Found 1 results
 }
 
+// ExamplePalace_SearchByVector demonstrates searching with a precomputed vector.
+func ExamplePalace_SearchByVector() {
+	ctx := context.Background()
+
+	palace, err := mempalace.New(ctx,
+		mempalace.WithPalacePath(tempDir("vector-search")),
+		mempalace.WithEmbedder(embedding.NewMockEmbedder(768)),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer palace.Close()
+
+	// Add some content first
+	_, err = palace.Add(ctx, "Vector search using embeddings",
+		mempalace.WithWingForAdd("vectest"),
+		mempalace.WithRoomForAdd("search"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create a vector (in real use, this would come from your embedding model)
+	vector := make([]float32, 768)
+	for i := range vector {
+		vector[i] = 0.01
+	}
+
+	// Search by vector
+	result, err := palace.SearchByVector(ctx, vector,
+		mempalace.WithWing("vectest"),
+		mempalace.WithLimit(5),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Found %d results\n", result.Total)
+	// Output: Found 1 results
+}
+
 // ExamplePalace_Add demonstrates adding content to the palace.
 func ExamplePalace_Add() {
 	ctx := context.Background()

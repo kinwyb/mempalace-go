@@ -452,6 +452,68 @@ func TestSearchOptions(t *testing.T) {
 	}
 }
 
+func TestSearchByVector(t *testing.T) {
+	ctx := context.Background()
+
+	palace := newTestPalace(t)
+	defer palace.Close()
+
+	// Add some content
+	_, err := palace.Add(ctx, "Vector database for similarity search",
+		WithWingForAdd("vectortest"),
+		WithRoomForAdd("tech"),
+	)
+	if err != nil {
+		t.Fatalf("Add failed: %v", err)
+	}
+
+	_, err = palace.Add(ctx, "Embedding models convert text to vectors",
+		WithWingForAdd("vectortest"),
+		WithRoomForAdd("ml"),
+	)
+	if err != nil {
+		t.Fatalf("Add failed: %v", err)
+	}
+
+	// Create a mock vector (same dimension as mock embedder)
+	mockVector := make([]float32, 768)
+	for i := range mockVector {
+		mockVector[i] = 0.01
+	}
+
+	// Search by vector
+	result, err := palace.SearchByVector(ctx, mockVector,
+		WithWing("vectortest"),
+		WithLimit(5),
+	)
+	if err != nil {
+		t.Fatalf("SearchByVector failed: %v", err)
+	}
+
+	if result.Total == 0 {
+		t.Error("SearchByVector should return results")
+	}
+
+	// Verify filters are applied
+	if result.Filters.Wing != "vectortest" {
+		t.Errorf("expected wing filter, got '%s'", result.Filters.Wing)
+	}
+
+	// Test with room filter
+	result2, err := palace.SearchByVector(ctx, mockVector,
+		WithWing("vectortest"),
+		WithRoom("tech"),
+		WithLimit(3),
+	)
+	if err != nil {
+		t.Fatalf("SearchByVector with room filter failed: %v", err)
+	}
+
+	if result2.Filters.Room != "tech" {
+		t.Errorf("expected room filter 'tech', got '%s'", result2.Filters.Room)
+	}
+}
+
 // Helper function
 func newTestPalace(t *testing.T) *Palace {
 	ctx := context.Background()
