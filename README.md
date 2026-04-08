@@ -1,0 +1,277 @@
+# MemPalace-Go
+
+> 本项目是 [MemPalace](https://github.com/milla-jovovich/mempalace) 的 Go 语言重写版本
+
+MemPalace 是一个本地 AI 记忆系统，采用"宫殿"（Palace）作为核心隐喻，将记忆存储在 Wings（翼）→ Rooms（房间）→ Drawers（抽屉）的层级结构中，通过语义搜索实现快速检索。
+
+## 特性
+
+- 🏛️ **宫殿式存储结构**：Wing（项目/人物）→ Room（主题）→ Drawer（文本块）
+- 🔍 **语义搜索**：基于向量相似度的智能检索
+- 📚 **四层记忆栈**：L0（身份）→ L1（核心故事）→ L2（按需）→ L3（深度搜索）
+- 🔗 **MCP 服务器**：支持 19 个工具的 Model Context Protocol 实现
+- 🗃️ **SQLite 向量存储**：无需外部数据库，内置 FTS5 全文搜索
+- 🎯 **AAAK 压缩方言**：实体识别与压缩编码
+
+## 安装
+
+```bash
+# 克隆仓库
+git clone https://github.com/kinwyb/mempalace-go.git
+cd mempalace-go
+
+# 构建
+go build -o mempalace ./cmd/mempalace
+
+# 安装到 GOPATH
+go install ./cmd/mempalace
+```
+
+## 快速开始
+
+### 初始化配置
+
+```bash
+# 首次运行设置（交互式配置）
+mempalace setup
+
+# 或使用默认配置
+mempalace status
+```
+
+### 挖掘项目文件
+
+```bash
+# 挖掘项目目录
+mempalace mine /path/to/project
+
+# 挖掘对话导出文件
+mempalace mine /path/to/conversations --mode convos
+
+# 预览模式（不实际存储）
+mempalace mine /path/to/project --dry-run
+```
+
+### 搜索内容
+
+```bash
+# 基本搜索
+mempalace search "golang 并发编程"
+
+# 按翼过滤
+mempalace search "api 设计" --wing myproject
+
+# 按房间过滤
+mempalace search "错误处理" --room technical
+```
+
+### 查看状态
+
+```bash
+# 显示宫殿状态
+mempalace status
+
+# 显示唤醒上下文（L0 + L1）
+mempalace wake-up
+```
+
+### 启动 MCP 服务器
+
+```bash
+# 启动 MCP 服务器（用于 AI 工具集成）
+mempalace mcp
+```
+
+## 命令参考
+
+| 命令 | 描述 |
+|------|------|
+| `mempalace init <dir>` | 检测目录结构，生成房间配置 |
+| `mempalace mine <dir>` | 挖掘项目文件到宫殿 |
+| `mempalace mine <dir> --mode convos` | 挖掘对话导出文件 |
+| `mempalace search <query>` | 语义搜索 |
+| `mempalace status` | 显示宫殿统计信息 |
+| `mempalace wake-up` | 显示 L0 + L1 唤醒上下文 |
+| `mempalace mcp` | 启动 MCP 服务器 |
+| `mempalace split <file>` | 拆分大型对话文件 |
+| `mempalace compress` | AAAK 压缩 |
+| `mempalace setup` | 首次运行配置 |
+
+## MCP 工具
+
+MCP 服务器提供以下 19 个工具：
+
+| 工具 | 描述 |
+|------|------|
+| `search` | 搜索记忆宫殿 |
+| `wake_up` | 获取 L0 + L1 唤醒上下文 |
+| `add_drawer` | 添加新抽屉 |
+| `get_status` | 获取宫殿状态 |
+| `list_wings` | 列出所有翼 |
+| `list_rooms` | 列出翼下的房间 |
+| `check_duplicate` | 检查重复内容 |
+| `get_layer_content` | 获取特定层内容 |
+| `delete_drawer` | 删除抽屉 |
+| `compress_drawer` | 压缩抽屉 |
+| `register_entity` | 注册实体 |
+| `detect_entities` | 检测实体 |
+| `get_taxonomy` | 获取分类体系 |
+| `mine_file` | 挖掘单个文件 |
+| `batch_add` | 批量添加抽屉 |
+| `get_recent` | 获取最近添加的内容 |
+| `get_drawer` | 获取特定抽屉 |
+| `update_drawer` | 更新抽屉 |
+| `detect_room` | 检测内容所属房间 |
+| `store_layer` | 存储到特定记忆层 |
+
+## 项目结构
+
+```
+mempalace-go/
+├── cmd/mempalace/          # CLI 入口
+│   └── main.go
+├── internal/
+│   ├── config/             # 配置管理
+│   ├── convominer/         # 对话挖掘
+│   ├── dialect/            # AAAK 压缩方言
+│   ├── entity/             # 实体检测
+│   ├── kg/                 # 知识图谱
+│   ├── layers/             # 四层记忆栈
+│   ├── mcp/                # MCP 服务器
+│   ├── miner/              # 项目文件挖掘
+│   ├── normalize/          # 对话格式标准化
+│   ├── onboarding/         # 首次运行引导
+│   ├── palace/             # 宫殿图遍历
+│   ├── searcher/           # 语义搜索
+│   └── split/              # 文件拆分
+├── pkg/
+│   ├── embedding/          # 嵌入模型接口
+│   └── vector/             # 向量存储接口
+├── go.mod
+└── README.md
+```
+
+## 四层记忆栈
+
+| 层级 | 名称 | 描述 | 用途 |
+|------|------|------|------|
+| L0 | 身份层 | 核心身份、关键偏好 | 始终激活 |
+| L1 | 核心故事 | 项目上下文、当前目标 | 上下文窗口 |
+| L2 | 按需层 | 需要时检索 | 搜索触发 |
+| L3 | 深度搜索 | 全面搜索完整上下文 | 深度分析 |
+
+## 配置
+
+配置文件位于 `~/.mempalace/config.yaml`，支持以下选项：
+
+```yaml
+# 宫殿存储路径
+palace_path: ~/.mempalace/palace
+
+# 嵌入模型配置
+embedding_model: nomic-embed-text
+ollama_host: http://localhost:11434
+
+# 文本处理
+chunk_size: 800
+chunk_overlap: 100
+min_chunk_size: 50
+
+# 搜索配置
+search_limit: 10
+similarity_threshold: 0.9
+
+# 日志级别
+log_level: info
+```
+
+### 环境变量
+
+配置可通过环境变量覆盖：
+
+```bash
+MEMPALACE_PALACE_PATH=/custom/path
+MEMPALACE_EMBEDDING_MODEL=text-embedding-3-small
+MEMPALACE_OLLAMA_HOST=http://localhost:11434
+MEMPALACE_LOG_LEVEL=debug
+```
+
+## 项目配置文件
+
+在项目目录中创建 `mempalace.yaml` 来自定义翼和房间：
+
+```yaml
+wing: my-project
+
+rooms:
+  - name: api
+    description: API 相关代码
+    keywords:
+      - endpoint
+      - handler
+      - route
+  
+  - name: database
+    description: 数据库相关
+    keywords:
+      - sql
+      - query
+      - migration
+  
+  - name: tests
+    description: 测试文件
+    keywords:
+      - test
+      - spec
+      - mock
+```
+
+## 运行测试
+
+```bash
+# 运行所有测试
+go test ./...
+
+# 运行特定包的测试
+go test ./internal/miner/...
+
+# 带覆盖率
+go test -cover ./...
+```
+
+## 与原版 Python 实现的差异
+
+| 特性 | Python 版本 | Go 版本 |
+|------|------------|---------|
+| 向量数据库 | ChromaDB | SQLite + FTS5 |
+| 日志 | Python logging | Go slog |
+| CLI 框架 | Click | Cobra |
+| 配置格式 | YAML | YAML |
+| MCP 工具数 | 19 | 19 |
+
+## 依赖
+
+- [github.com/spf13/cobra](https://github.com/spf13/cobra) - CLI 框架
+- [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) - 纯 Go SQLite 驱动
+- [gopkg.in/yaml.v3](https://gopkg.in/yaml.v3) - YAML 解析
+
+## 开发
+
+```bash
+# 格式化代码
+go fmt ./...
+
+# 静态检查
+go vet ./...
+
+# 构建
+go build -o mempalace ./cmd/mempalace
+```
+
+## 许可证
+
+MIT License
+
+## 致谢
+
+本项目是对 [MemPalace](https://github.com/milla-jovovich/mempalace) 的 Go 语言重写实现。
