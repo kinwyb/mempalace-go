@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,6 +152,15 @@ func (s *SQLiteStore) Add(ctx context.Context, docs []Document) error {
 			continue
 		}
 
+		// Update FTS5 index
+		_, err = s.db.Exec(`
+			INSERT INTO documents_fts (id, content, wing, room)
+			VALUES (?, ?, ?, ?)
+		`, doc.ID, doc.Content, wing, room)
+		if err != nil {
+			slog.Warn("failed to update FTS5 index", "id", doc.ID, "error", err)
+		}
+
 		// Generate and store embedding if embedder is available
 		if s.embedder != nil {
 			embedding, err := s.embedder.Embed(ctx, doc.Content)
@@ -202,6 +212,11 @@ func (s *SQLiteStore) Search(ctx context.Context, query string, wing, room strin
 		if err != nil {
 			slog.Warn("failed to scan search result", "error", err)
 			continue
+		}
+
+		// BM25 returns negative scores (lower is better), convert to positive
+		if result.Score < 0 {
+			result.Score = -result.Score
 		}
 
 		result.Metadata = jsonToMetadata(metadataJSON)
@@ -325,6 +340,11 @@ func (s *SQLiteStore) Delete(ctx context.Context, id string) error {
 	}
 
 	_, err = s.db.Exec("DELETE FROM embeddings WHERE document_id = ?", id)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec("DELETE FROM documents_fts WHERE id = ?", id)
 	return err
 }
 
@@ -333,13 +353,34 @@ func (s *SQLiteStore) DeleteByWing(ctx context.Context, wing string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec("DELETE FROM documents WHERE wing = ?", wing)
+	// Get IDs first for FTS5 deletion
+	rows, err := s.db.Query("SELECT id FROM documents WHERE wing = ?", wing)
+	if err != nil {
+		return err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		ids = append(ids, id)
+	}
+	rows.Close()
+
+	_, err = s.db.Exec("DELETE FROM documents WHERE wing = ?", wing)
 	if err != nil {
 		return err
 	}
 
 	_, err = s.db.Exec("DELETE FROM embeddings WHERE document_id NOT IN (SELECT id FROM documents)")
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Delete from FTS5 index
+	for _, id := range ids {
+		s.db.Exec("DELETE FROM documents_fts WHERE id = ?", id)
+	}
+	return nil
 }
 
 // DeleteByRoom removes all documents in a wing/room.
@@ -347,13 +388,34 @@ func (s *SQLiteStore) DeleteByRoom(ctx context.Context, wing, room string) error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec("DELETE FROM documents WHERE wing = ? AND room = ?", wing, room)
+	// Get IDs first for FTS5 deletion
+	rows, err := s.db.Query("SELECT id FROM documents WHERE wing = ? AND room = ?", wing, room)
+	if err != nil {
+		return err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		ids = append(ids, id)
+	}
+	rows.Close()
+
+	_, err = s.db.Exec("DELETE FROM documents WHERE wing = ? AND room = ?", wing, room)
 	if err != nil {
 		return err
 	}
 
 	_, err = s.db.Exec("DELETE FROM embeddings WHERE document_id NOT IN (SELECT id FROM documents)")
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Delete from FTS5 index
+	for _, id := range ids {
+		s.db.Exec("DELETE FROM documents_fts WHERE id = ?", id)
+	}
+	return nil
 }
 
 // Count returns the total number of documents.
@@ -544,8 +606,7 @@ func jsonToMetadata(s string) map[string]any {
 func floatsToBlob(f []float32) []byte {
 	blob := make([]byte, len(f)*4)
 	for i, v := range f {
-		// Simple float32 to bytes conversion
-		bits := uint32(v)
+		bits := math.Float32bits(v)
 		blob[i*4] = byte(bits >> 24)
 		blob[i*4+1] = byte(bits >> 16)
 		blob[i*4+2] = byte(bits >> 8)
@@ -559,7 +620,7 @@ func blobToFloats(b []byte) []float32 {
 	f := make([]float32, count)
 	for i := 0; i < count; i++ {
 		bits := uint32(b[i*4])<<24 | uint32(b[i*4+1])<<16 | uint32(b[i*4+2])<<8 | uint32(b[i*4+3])
-		f[i] = float32(bits)
+		f[i] = math.Float32frombits(bits)
 	}
 	return f
 }

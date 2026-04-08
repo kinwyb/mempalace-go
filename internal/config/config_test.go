@@ -89,17 +89,27 @@ func TestSaveAndLoad(t *testing.T) {
 }
 
 func TestEnvironmentOverride(t *testing.T) {
-	// Set environment variable
+	// Test 1: Environment variable fills empty config value
 	os.Setenv("MEMPALACE_EMBEDDING_MODEL", "env-model")
 	defer os.Unsetenv("MEMPALACE_EMBEDDING_MODEL")
 
-	cfg, err := Load("")
-	if err != nil {
-		t.Fatalf("Load failed: %v", err)
+	cfg := &Config{
+		EmbeddingModel: "", // Empty - should be filled by env
 	}
+	applyEnvOverrides(cfg)
 
 	if cfg.EmbeddingModel != "env-model" {
-		t.Errorf("Expected embedding model from env, got %s", cfg.EmbeddingModel)
+		t.Errorf("Expected embedding model from env for empty config, got %s", cfg.EmbeddingModel)
+	}
+
+	// Test 2: Config file value takes priority over environment
+	cfg2 := &Config{
+		EmbeddingModel: "config-model", // Non-empty - should not be overridden
+	}
+	applyEnvOverrides(cfg2)
+
+	if cfg2.EmbeddingModel != "config-model" {
+		t.Errorf("Expected config-model to take priority, got %s", cfg2.EmbeddingModel)
 	}
 }
 

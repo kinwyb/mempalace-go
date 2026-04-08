@@ -41,7 +41,7 @@ var LayerConfigs = map[Layer]LayerConfig{
 		Description:  "Core identity, essential story, critical preferences",
 		MaxTokens:    500,
 		Priority:     100,
-		QueryPattern: "identity|about_me|core|essentials",
+		QueryPattern: "identity about_me core essentials",
 		Rooms:        []string{"identity", "about_me", "core", "preferences"},
 	},
 	L1: {
@@ -49,7 +49,7 @@ var LayerConfigs = map[Layer]LayerConfig{
 		Description:  "Project context, current goals, recent decisions",
 		MaxTokens:    1000,
 		Priority:     80,
-		QueryPattern: "current|recent|active|project|goal",
+		QueryPattern: "current recent active project goal",
 		Rooms:        []string{"project_context", "goals", "recent", "active"},
 	},
 	L2: {

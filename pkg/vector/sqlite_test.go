@@ -250,9 +250,40 @@ func NewMockEmbedderForTest(dimension int) *MockEmbedder {
 
 func (e *MockEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
 	embedding := make([]float32, e.dimension)
-	for i := range embedding {
-		embedding[i] = 0.1
+
+	// Simple hash-based embedding generation for variety
+	if len(text) > 0 {
+		hash := uint32(0)
+		for _, c := range text {
+			hash = hash*31 + uint32(c)
+		}
+
+		// Use hash to seed different values
+		for i := range embedding {
+			seed := hash + uint32(i)
+			// Generate normalized values between -1 and 1
+			val := float32((seed % 1000) - 500) / 500.0
+			embedding[i] = val
+		}
+
+		// Normalize the embedding
+		var norm float32
+		for _, v := range embedding {
+			norm += v * v
+		}
+		if norm > 0 {
+			invNorm := 1.0 / float64(norm)
+			for i := range embedding {
+				embedding[i] = embedding[i] * float32(invNorm)
+			}
+		}
+	} else {
+		// Default embedding for empty text
+		for i := range embedding {
+			embedding[i] = 0.01
+		}
 	}
+
 	return embedding, nil
 }
 

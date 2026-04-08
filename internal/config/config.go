@@ -16,11 +16,17 @@ type Config struct {
 	// PalacePath is the directory where the palace (vector store) lives.
 	PalacePath string `yaml:"palace_path"`
 
+	// EmbeddingProvider is the embedding provider (ollama or openai).
+	EmbeddingProvider string `yaml:"embedding_provider"`
+
 	// EmbeddingModel is the model used for generating embeddings.
 	EmbeddingModel string `yaml:"embedding_model"`
 
 	// EmbeddingAPIBase is the base URL for the embedding API.
 	EmbeddingAPIBase string `yaml:"embedding_api_base"`
+
+	// OpenAIAPIKey is the OpenAI API key.
+	OpenAIAPIKey string `yaml:"openai_api_key"`
 
 	// OllamaHost is the Ollama server host.
 	OllamaHost string `yaml:"ollama_host"`
@@ -53,8 +59,10 @@ func DefaultConfig() *Config {
 
 	return &Config{
 		PalacePath:          filepath.Join(homeDir, ".mempalace", "palace"),
+		EmbeddingProvider:   "ollama",
 		EmbeddingModel:      "nomic-embed-text",
 		EmbeddingAPIBase:    "",
+		OpenAIAPIKey:        "",
 		OllamaHost:          "http://localhost:11434",
 		LogLevel:            "info",
 		ChunkSize:           800,
@@ -93,31 +101,58 @@ func Load(configPath string) (*Config, error) {
 	return cfg, nil
 }
 
-// applyEnvOverrides applies environment variable overrides.
+// applyEnvOverrides applies environment variable overrides (only if config value is empty).
 func applyEnvOverrides(cfg *Config) {
-	if v := os.Getenv("MEMPALACE_PALACE_PATH"); v != "" {
-		cfg.PalacePath = v
-	}
-	if v := os.Getenv("MEMPALACE_EMBEDDING_MODEL"); v != "" {
-		cfg.EmbeddingModel = v
-	}
-	if v := os.Getenv("MEMPALACE_EMBEDDING_API_BASE"); v != "" {
-		cfg.EmbeddingAPIBase = v
-	}
-	if v := os.Getenv("MEMPALACE_OLLAMA_HOST"); v != "" {
-		cfg.OllamaHost = v
-	}
-	if v := os.Getenv("MEMPALACE_LOG_LEVEL"); v != "" {
-		cfg.LogLevel = v
-	}
-	if v := os.Getenv("MEMPALACE_CHUNK_SIZE"); v != "" {
-		if size, err := parseInt(v); err == nil {
-			cfg.ChunkSize = size
+	if cfg.PalacePath == "" {
+		if v := os.Getenv("MEMPALACE_PALACE_PATH"); v != "" {
+			cfg.PalacePath = v
 		}
 	}
-	if v := os.Getenv("MEMPALACE_SEARCH_LIMIT"); v != "" {
-		if limit, err := parseInt(v); err == nil {
-			cfg.SearchLimit = limit
+	if cfg.EmbeddingProvider == "" {
+		if v := os.Getenv("MEMPALACE_EMBEDDING_PROVIDER"); v != "" {
+			cfg.EmbeddingProvider = v
+		}
+	}
+	if cfg.EmbeddingModel == "" {
+		if v := os.Getenv("MEMPALACE_EMBEDDING_MODEL"); v != "" {
+			cfg.EmbeddingModel = v
+		}
+	}
+	if cfg.EmbeddingAPIBase == "" {
+		if v := os.Getenv("MEMPALACE_EMBEDDING_API_BASE"); v != "" {
+			cfg.EmbeddingAPIBase = v
+		}
+	}
+	if cfg.OpenAIAPIKey == "" {
+		if v := os.Getenv("MEMPALACE_OPENAI_API_KEY"); v != "" {
+			cfg.OpenAIAPIKey = v
+		}
+		if v := os.Getenv("OPENAI_API_KEY"); v != "" && cfg.OpenAIAPIKey == "" {
+			cfg.OpenAIAPIKey = v
+		}
+	}
+	if cfg.OllamaHost == "" {
+		if v := os.Getenv("MEMPALACE_OLLAMA_HOST"); v != "" {
+			cfg.OllamaHost = v
+		}
+	}
+	if cfg.LogLevel == "" {
+		if v := os.Getenv("MEMPALACE_LOG_LEVEL"); v != "" {
+			cfg.LogLevel = v
+		}
+	}
+	if cfg.ChunkSize == 0 {
+		if v := os.Getenv("MEMPALACE_CHUNK_SIZE"); v != "" {
+			if size, err := parseInt(v); err == nil {
+				cfg.ChunkSize = size
+			}
+		}
+	}
+	if cfg.SearchLimit == 0 {
+		if v := os.Getenv("MEMPALACE_SEARCH_LIMIT"); v != "" {
+			if limit, err := parseInt(v); err == nil {
+				cfg.SearchLimit = limit
+			}
 		}
 	}
 }

@@ -90,8 +90,15 @@ func getStoreAndConfig(ctx context.Context) (*config.Config, vector.Store, error
 		return nil, nil, fmt.Errorf("failed to create palace directory: %w", err)
 	}
 
-	// Create embedder (using mock for now)
-	embedder := embedding.NewMockEmbedder(768)
+	// Create embedder based on provider
+	var embedder embedding.Embedder
+	switch cfg.EmbeddingProvider {
+	case "openai":
+		embedder = embedding.NewOpenAIEmbedder(cfg.OpenAIAPIKey, cfg.EmbeddingAPIBase, cfg.EmbeddingModel)
+	default:
+		// Default to ollama
+		embedder = embedding.NewOllamaEmbedder(cfg.OllamaHost, cfg.EmbeddingModel)
+	}
 
 	// Create vector store
 	dbPath := cfg.PalacePath + "/palace.db"
